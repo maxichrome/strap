@@ -5,48 +5,60 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/cheggaaa/pb/v3"
 )
 
-var bar pb.ProgressBar
-var homeDir string
-var configRepoUri string
+const (
+	strapVer string = "0.1.0"
+)
+
+var (
+	bar pb.ProgressBar
+
+	homeDir string
+	strapDir string
+
+	configRepoUri string
+)
 
 func main() {
 	// todo: add version number here
-	fmt.Println("strap  v{version}")
+	fmt.Printf("strap  v%s\n", strapVer)
 
 	barTemplate := `{{ bar . "[" "#" "#" "~" "]"}} {{percent .}}`
 	bar = *pb.ProgressBarTemplate(barTemplate).New(100)
 
 	if userHomeDir, err := os.UserHomeDir(); err == nil {
 		homeDir = userHomeDir
+		strapDir = path.Join(homeDir, ".strap")
 	} else {
 		fmt.Println("Funky failure getting user home directory - aborting!", err)
 		return
 	}
 
-	if _, err := os.Stat(path.Join(homeDir, ".strap.yml")); err == nil {
+	// if _, err := os.Stat(path.Join(strapDir, "straplock.yml")); err == nil {
+	if _, err := os.Stat(strapDir); err == nil {
 		returningRun()
 	} else if os.IsNotExist(err) {
 		firstRun()
 	} else {
-		fmt.Println("Funky failure checking for ~/.strap file - aborting!")
+		fmt.Println(err)
+		fmt.Println("Funky failure checking for ~/.strap directory - aborting!")
 		return
 	}
 }
 
 func firstRun() {
-	fmt.Println("Let's get you set up! I'll need a bit of info from you...\n ")
-	
-	// todo: check ~/.strap contents before re-prompting for uri
-	// (will have record of repo uri and stuff)
+	//! NOTE: DO NOT MODIFY FILESYSTEM UNTIL THE USER HAS PROVIDED A REPO URI!
 
-	if output, err := Prompt("Enter your config repo uri: "); err == nil && len(configRepoUri) < 1 {
+	fmt.Println("Let's get you set up! I'll need a bit of info from you...\n ")
+
+	//! past this line, filesystem modifications are OK.
+	if output, err := Prompt("Enter your config repo uri:"); err == nil && len(configRepoUri) < 1 {
 		configRepoUri = output
 	} else {
 		fmt.Println(err)
@@ -54,19 +66,36 @@ func firstRun() {
 		return
 	}
 
-	bar.Start()
+	fmt.Printf("Cloning from %s...\n", configRepoUri)
 
-	for bar.Current() < 100 {
-		bar.Increment()
-		time.Sleep(time.Second / 10)
+	if _, err := os.Stat(strapDir); err == nil || !os.IsNotExist(err) {
+		if input, err := Prompt("\n\nTHIS IS NOT RECOVERABLE:\nAre you sure you would like to remove your old strap synchronization? (Y/n)"); err == nil {
+			if input == "Y" {
+				os.RemoveAll(strapDir)
+			} else {
+				fmt.Println("You really scared me for a minute! Have a nice day...")
+				return
+			}
+		}
+
+		return
 	}
 
-	bar.Finish()
-	// todo: validate uri with git and proceed
+	cloneCmd := exec.Command("git", "clone", configRepoUri, path.Join(homeDir, ".strap/repo"))
+
+	if out, err := cloneCmd.Output(); err == nil {
+		fmt.Print(out)
+		
+		fmt.Println("Uh, I think that worked?!")
+	} else {
+		fmt.Println(err)
+		fmt.Println("Funky failure while cloning config repo")
+		return
+	}
 }
 
 func returningRun() {
-	 if input, err := Prompt("Continue using existing repo? (y/n/?) "); err == nil {
+	 if input, err := Prompt("Continue using existing repo? (y/n/?)"); err == nil {
 		if strings.ToLower(input) == "y" {
 			fmt.Println("Checking for updates...")
 
@@ -96,7 +125,7 @@ func Prompt(promptText string) (string, error) {
 	for len(scanner.Text()) < 1 && timesPrompted < 5 {
 		timesPrompted++
 
-		fmt.Print(promptText)
+		fmt.Printf("%s ", promptText)
 		scanner.Scan()
 	}
 
