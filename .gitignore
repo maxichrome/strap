@@ -1,4 +1,11 @@
-# executables
-/*
-*.exe
-!/*.*
+# built files
+bin/
+
+# all source
+!src/
+
+# spam
+.DS_Store
+
+# exclude all idea files
+!ideation/

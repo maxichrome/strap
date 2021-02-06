@@ -1,13 +1,14 @@
 # strap lockfile
+# located in ~/.strap.yml
 # probably yml format because *no reason*
 
 # strap version
-strap: 0.1.0
+strap: "0.1.0"
 
 # config repo
 repo:
   uri: https://github.com/ghost/dotfiles # example :P
-  lastpull: <COMMIT_HASH_HERE>
+  head_commit: <COMMIT_HASH_HERE>
 
 # I'd also like to track local file changes without having
 # a weird unused repo clone taking up space somewhere

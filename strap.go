@@ -5,26 +5,37 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/cheggaaa/pb/v3"
 )
 
 var bar pb.ProgressBar
+var homeDir string
+var configRepoUri string
 
 func main() {
 	// todo: add version number here
 	fmt.Println("strap  v{version}")
 
-	bar = *pb.Simple.New(100)
+	barTemplate := `{{ bar . "[" "#" "#" "~" "]"}} {{percent .}}`
+	bar = *pb.ProgressBarTemplate(barTemplate).New(100)
 
-	if _, err := os.Stat("~/.strap"); err == nil {
-		// branch -> reinstall / check for changed files
+	if userHomeDir, err := os.UserHomeDir(); err == nil {
+		homeDir = userHomeDir
+	} else {
+		fmt.Println("Funky failure getting user home directory - aborting!", err)
+		return
+	}
+
+	if _, err := os.Stat(path.Join(homeDir, ".strap.yml")); err == nil {
+		returningRun()
 	} else if os.IsNotExist(err) {
 		firstRun()
 	} else {
-		// other funky failure
-		fmt.Println("Unable to check for ~/.strap file - aborting!")
+		fmt.Println("Funky failure checking for ~/.strap file - aborting!")
 		return
 	}
 }
@@ -32,30 +43,53 @@ func main() {
 func firstRun() {
 	fmt.Println("Let's get you set up! I'll need a bit of info from you...\n ")
 	
-	// todo: check for ~/.strap before re-prompting
+	// todo: check ~/.strap contents before re-prompting for uri
 	// (will have record of repo uri and stuff)
-	var dotfileUri string
 
-	for len(dotfileUri) < 1 {
-		output, err := prompt("Enter your config repo uri: ")
-		dotfileUri = output
-
-		if err != nil {
-			fmt.Println("Could not get config repo uri!", err)
-			return
-		}
+	if output, err := Prompt("Enter your config repo uri: "); err == nil && len(configRepoUri) < 1 {
+		configRepoUri = output
+	} else {
+		fmt.Println(err)
+		fmt.Println("Funky failure getting config repo uri - aborting!")
+		return
 	}
 
 	bar.Start()
 
 	for bar.Current() < 100 {
 		bar.Increment()
-		time.Sleep(time.Second / 2)
+		time.Sleep(time.Second / 10)
 	}
+
+	bar.Finish()
 	// todo: validate uri with git and proceed
 }
 
-func prompt(promptText string) (string, error) {
+func returningRun() {
+	 if input, err := Prompt("Continue using existing repo? (y/n/?) "); err == nil {
+		if strings.ToLower(input) == "y" {
+			fmt.Println("Checking for updates...")
+
+			// todo: diff tracked dotfiles against repo
+			// ignore apps at this point
+		} else if strings.ToLower(input) == "n" {
+			firstRun()
+		} else if input == "?" {
+			fmt.Println(configRepoUri)
+			returningRun()
+			return
+		} else {
+			fmt.Println("Invalid entry - try again")
+			returningRun()
+		}
+	} else {
+		fmt.Println(err)
+		fmt.Println("Funky failure getting continue input - aborting!")
+		return
+	}
+}
+
+func Prompt(promptText string) (string, error) {
 	scanner := bufio.NewScanner(os.Stdin)
 	var timesPrompted int = 0
 
@@ -71,4 +105,14 @@ func prompt(promptText string) (string, error) {
 	}
 
 	return scanner.Text(), nil
+}
+
+type StrapLock struct {
+	strap   string // version
+
+	repo struct {
+		uri					string
+		head_commit	string
+    ghost_dir   string
+	}
 }
