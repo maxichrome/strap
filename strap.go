@@ -77,8 +77,6 @@ func firstRun() {
 				return
 			}
 		}
-
-		return
 	}
 
 	cloneCmd := exec.Command("git", "clone", configRepoUri, path.Join(homeDir, ".strap/repo"))
