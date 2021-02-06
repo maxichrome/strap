@@ -1,0 +1,22 @@
+# strap lockfile
+# probably yml format because *no reason*
+
+# strap version
+strap: 0.1.0
+
+# config repo
+repo:
+  uri: https://github.com/ghost/dotfiles # example :P
+  lastpull: <COMMIT_HASH_HERE>
+
+# I'd also like to track local file changes without having
+# a weird unused repo clone taking up space somewhere
+# so I'll keep config file hashes and if they differ when checking
+# I'll offer to commit+push the changes
+#
+# this might be harder than keeping an unused clone of the repo though
+# so who knows
+files:
+  .vimrc: <FILE_HASH_HERE>
+  vscode:
+    settings.json: <FILE_HASH_HERE>

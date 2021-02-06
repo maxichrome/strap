@@ -2,10 +2,16 @@
 # config repo that contains dotfiles and other configurations
 
 # not sure where to pull pkg names from
-apps:
-  - vscode # or atom, etc
-  - nvim # or vim, etc
-  - msedge # or chrome, etc
+systems:
+  cloud-dev:
+    apps:
+      - vscode-server
+      - nvim as vim
+  default:
+    apps:
+      - vscode
+      - msedge
+      - nvim as vim
 
 # map app name -> respective config directory in repo
 # app names could be stored in a db in strap itself
