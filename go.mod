@@ -1,5 +1,5 @@
 module github.com/hadenpf/strap
 
-go 1.15
+go 1.16
 
-require github.com/cheggaaa/pb/v3 v3.0.5
+require github.com/fatih/color v1.10.0

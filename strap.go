@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"strings"
 
-	"github.com/cheggaaa/pb/v3"
+	"github.com/hadenpf/strap/log"
+	"github.com/hadenpf/strap/repo"
 )
 
 const (
@@ -17,26 +17,20 @@ const (
 )
 
 var (
-	bar pb.ProgressBar
-
-	homeDir string
+	homeDir  string
 	strapDir string
 
-	configRepoUri string
+	configRepoURI string
 )
 
 func main() {
-	// todo: add version number here
-	fmt.Printf("strap  v%s\n", strapVer)
-
-	barTemplate := `{{ bar . "[" "#" "#" "~" "]"}} {{percent .}}`
-	bar = *pb.ProgressBarTemplate(barTemplate).New(100)
+	fmt.Printf("strap v%s\n", strapVer)
 
 	if userHomeDir, err := os.UserHomeDir(); err == nil {
 		homeDir = userHomeDir
 		strapDir = path.Join(homeDir, ".strap")
 	} else {
-		fmt.Println("Funky failure getting user home directory - aborting!", err)
+		log.Failure("getting user home directory", err)
 		return
 	}
 
@@ -46,8 +40,7 @@ func main() {
 	} else if os.IsNotExist(err) {
 		firstRun()
 	} else {
-		fmt.Println(err)
-		fmt.Println("Funky failure checking for ~/.strap directory - aborting!")
+		log.Failure("checking for ~/.strap", err)
 		return
 	}
 }
@@ -57,52 +50,62 @@ func firstRun() {
 
 	fmt.Println("Let's get you set up! I'll need a bit of info from you...\n ")
 
-	//! past this line, filesystem modifications are OK.
-	if output, err := Prompt("Enter your config repo uri:"); err == nil && len(configRepoUri) < 1 {
-		configRepoUri = output
+	if output, err := prompt("Enter your config repo uri:"); err == nil && len(configRepoURI) < 1 {
+		//! past this line, filesystem modifications are OK.
+		configRepoURI = output
 	} else {
-		fmt.Println(err)
-		fmt.Println("Funky failure getting config repo uri - aborting!")
+		log.Failure("getting config repo uri", err)
 		return
 	}
 
-	fmt.Printf("Cloning from %s...\n", configRepoUri)
-
 	if _, err := os.Stat(strapDir); err == nil || !os.IsNotExist(err) {
-		if input, err := Prompt("\n\nTHIS IS NOT RECOVERABLE:\nAre you sure you would like to remove your old strap synchronization? (Y/n)"); err == nil {
+		if input, err := prompt("WARNING! This action will overwrite the existing strap sync.\nContinue? (Y/n)"); err == nil {
 			if input == "Y" {
 				os.RemoveAll(strapDir)
+			} else if strings.ToLower(input) == "n" {
+				fmt.Println("Smart choice.")
+				return
 			} else {
-				fmt.Println("You really scared me for a minute! Have a nice day...")
+
 				return
 			}
+		} else {
+			log.Failure("getting overwrite confirmation", err)
+			return
 		}
 	}
 
-	cloneCmd := exec.Command("git", "clone", configRepoUri, path.Join(homeDir, ".strap/repo"))
-
-	if out, err := cloneCmd.Output(); err == nil {
-		fmt.Print(out)
-		
+	if err := repo.Clone(configRepoURI, path.Join(homeDir, ".strap/repo")); err == nil {
 		fmt.Println("Uh, I think that worked?!")
 	} else {
-		fmt.Println(err)
-		fmt.Println("Funky failure while cloning config repo")
+		log.Failure("cloning config repo", err)
 		return
 	}
 }
 
 func returningRun() {
-	 if input, err := Prompt("Continue using existing repo? (y/n/?)"); err == nil {
+	if input, err := prompt("Continue using existing repo? (y/n/?)"); err == nil {
 		if strings.ToLower(input) == "y" {
 			fmt.Println("Checking for updates...")
 
 			// todo: diff tracked dotfiles against repo
-			// ignore apps at this point
+			//:
+			// copy tracked dotfiles into ghost-repo path
+			// use lockfile to track respective paths
+			// 
+			// then `git status` in ghost repo to find
+			// any changes | parse status output and
+			// print it nicely, asking user to update the
+			// file in ghost repo:
+			//   Add this file as change? ((y)es/(n)o/(d)iff/(a)ll yes/(m)anual -> cd into repo)
+			//
+			// === FILE REVIEW COMPLETED ===
+			//  >Commit changes? (Y/n/m)
+			//  >Push changes (Y/n/(F)orce/m)
 		} else if strings.ToLower(input) == "n" {
 			firstRun()
 		} else if input == "?" {
-			fmt.Println(configRepoUri)
+			fmt.Println(configRepoURI)
 			returningRun()
 			return
 		} else {
@@ -110,15 +113,14 @@ func returningRun() {
 			returningRun()
 		}
 	} else {
-		fmt.Println(err)
-		fmt.Println("Funky failure getting continue input - aborting!")
+		log.Failure("getting continue input", err)
 		return
 	}
 }
 
-func Prompt(promptText string) (string, error) {
+func prompt(promptText string) (string, error) {
 	scanner := bufio.NewScanner(os.Stdin)
-	var timesPrompted int = 0
+	timesPrompted := 0
 
 	for len(scanner.Text()) < 1 && timesPrompted < 5 {
 		timesPrompted++
@@ -128,18 +130,20 @@ func Prompt(promptText string) (string, error) {
 	}
 
 	if timesPrompted >= 5 {
-		return "", errors.New("Retry limit exceeded")
+		return "", errors.New("retry limit exceeded")
 	}
 
 	return scanner.Text(), nil
 }
 
+// StrapLock is the format of the straplock.yml file.
 type StrapLock struct {
-	strap   string // version
+	// version of Strap the file was created with
+	strapVersion string
 
 	repo struct {
-		uri					string
-		head_commit	string
-    ghost_dir   string
+		uri        string
+		headCommit string
+		ghostDir   string
 	}
 }

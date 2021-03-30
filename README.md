@@ -20,7 +20,7 @@ draft bullet points:
 
 ## Contributing
 
-If you'd like to contribute to improve `strap`, first of all, thank you! I'm glad the project is something you'd like to see improve. Before contributing, please read the [license](./LICENSE).
+If you'd like to contribute to improve `strap` — first of all, thank you! I'm glad the project is something you'd like to see improve. Before contributing, please read the [license](./LICENSE).
 
 **By contributing to this repository, you agree that you have read and understand the terms of the license.**
 
